@@ -1,0 +1,47 @@
+pipeline{
+    agent any
+       tools {
+          maven 'maven'
+        }
+        environment {
+        DOCKER_TAG = getVersion()
+        }
+
+        stages{
+            stage('SCM'){
+                steps{
+                git credentialsId: 'Git-add', 
+                     url: 'https://github.com/pramodmallick0013/Ansible_JK_Docker_Dev.git'
+                    }
+                }        
+        stage('Maven Build'){
+            steps{
+                sh "mvn clean package"
+            }
+        }
+    
+        stage('Docker Build'){
+            steps{
+                sh "docker build . -t pdocker7896/pramod_app:${DOCKER_TAG}"
+            }
+        }    
+        
+        stage('DockerHub Push '){
+            steps{
+                withCredentials([string(credentialsId: 'doc-pwd', variable: 'docker_pwd')]) {
+                sh "docker login -u pdocker7896 -p ${docker_pwd}"
+            }
+                sh "docker push pdocker7896/pramod_app:${DOCKER_TAG}"
+            }
+        }
+            stage('Docker Deploy'){
+             steps{
+             ansiblePlaybook credentialsId: 'Dev_server', disableHostKeyChecking: true, extras:"-e DOCKER_TAG=${DOCKER_TAG}", installation: 'ansible', inventory: 'dev.inv', playbook: 'deploy-docker.yml'           
+            }
+        }
+      }    
+    }
+         def getVersion(){
+         def commitHash = sh returnStdout: true, script: 'git rev-parse --short HEAD'
+         return commitHash
+        }   
